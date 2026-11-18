@@ -31,7 +31,7 @@ class ConfigError(ValueError):
 def make_api_store():
     """Хранилище api_id/api_hash: Диспетчер учетных данных (служба tg-mcp, запись api_credentials), иначе DPAPI."""
     from .secret_store import SecretStore  # noqa: PLC0415
-    return SecretStore("tg-mcp", "api_credentials", paths.DATA_DIR / "api_credentials.dpapi")
+    return SecretStore("tg-mcp" + paths.instance_suffix(), "api_credentials", paths.DATA_DIR / "api_credentials.dpapi")
 
 
 
@@ -241,7 +241,8 @@ class Config:
                     data[key] = []
                     changed = True
             for a in data["accounts"]:
-                a["permissions"] = perms_mod.normalize(a.get("permissions"))
+                a["permissions"], migrated = perms_mod.migrate(a.get("permissions"))
+                changed = changed or migrated
                 a.setdefault("proxy", "app")
             self._data = data
             if changed or not self.path.exists():

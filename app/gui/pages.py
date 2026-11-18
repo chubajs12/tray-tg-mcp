@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QButtonGroup, QComboBox, QDial
 
 from .. import paths, winutil
 from ..config import ConfigError, PROXY_TYPE_TITLES, mask_proxy, port_is_free, proxy_title
-from ..permissions import GROUPS, PRESET_TITLES, PRESETS, preset_of
+from ..permissions import GROUP_HINTS, GROUPS, PRESET_TITLES, PRESETS, preset_of
 from .proxy_dialog import ProxyDialog
 from .theme import Palette
 from .widgets import Avatar, Card, SettingRow, StatusDot, Toggle, glyph_icon, label, restyle, sep
@@ -572,7 +572,7 @@ class RightsPage(Page):
             tg = Toggle(self.pal)
             tg.toggled.connect(lambda on, key=g: self.changed(key, on))
             self.toggles[g] = tg
-            self.groups_card.add(SettingRow(None, t, tg))
+            self.groups_card.add(SettingRow(None, t, tg, sub=GROUP_HINTS.get(g)))
         self.col.addWidget(self.groups_card)
 
         pre = Card("Быстрые наборы")

@@ -151,9 +151,113 @@ async def test_floodwait_blocks_further_writes(env):
 
 
 # ---------- права ----------
-async def test_new_account_is_read_only(env):
+async def test_new_account_defaults_read_download_saved(env):
     acc = await env.mgr.add_account("Новый")
-    assert env.cfg.permissions(acc) == PRESETS["read_only"]
+    p = env.cfg.permissions(acc)
+    assert {g for g, v in p.items() if v} == {"read", "download", "send_saved"}
+
+
+def _ents(svc, mapping):
+    """get_entity по строке/числу → пользователь; self — id 1 (как get_me в FakeService)."""
+    async def get_entity(x):
+        key = str(x).lstrip("@")
+        if key not in mapping:
+            raise ValueError("нет")
+        return mapping[key]
+    svc.client.get_entity = AsyncMock(side_effect=get_entity)
+
+
+SAVED_ONLY = {g: g in ("read", "send_saved") for g in GROUPS}
+
+
+async def test_saved_only_allows_own_saved_messages(env):
+    acc, svc = await add(env)
+    env.cfg.set_permissions(acc, SAVED_ONLY)
+    me = make_user(uid=1, first="Я", last=None, username="myname")
+    _ents(svc, {"1": me, "myname": me, "ivan": make_user()})
+    for target in ("me", "self", "избранное", "saved", "1", "@myname"):
+        await env.tools.send_message(chat=target, text=f"в избранное ({target})")
+    assert svc.client.send_message.await_count == 6
+    # reply и topic в Избранном допустимы
+    await env.tools.send_message(chat="me", text="ответ", reply_to=5)
+    assert svc.client.send_message.await_count == 7
+
+
+async def test_saved_only_denies_other_chats(env, tmp_path):
+    acc, svc = await add(env)
+    env.cfg.set_permissions(acc, SAVED_ONLY)
+    _ents(svc, {"ivan": make_user(), "10": make_user()})
+    for target in ("@ivan", "10"):
+        with pytest.raises(ToolError, match="разрешена отправка только в Избранное"):
+            await env.tools.send_message(chat=target, text="чужому")
+    f = tmp_path / "a.txt"
+    f.write_text("x", encoding="utf-8")
+    svc.client.send_file = AsyncMock()
+    with pytest.raises(ToolError, match="только в Избранное"):
+        await env.tools.send_file(chat="@ivan", path=str(f))
+    svc.client.send_message.assert_not_called()
+    svc.client.send_file.assert_not_called()
+    assert [r["ok"] for r in journal(env) if r["tool"] in ("send_message", "send_file")] == [False, False, False]
+
+
+async def test_general_send_does_not_depend_on_saved_flag(env):
+    acc, svc = await add(env)
+    env.cfg.set_permissions(acc, {g: g in ("read", "send") for g in GROUPS})  # send_saved выключено
+    _ents(svc, {"ivan": make_user()})
+    await env.tools.send_message(chat="@ivan", text="всем можно")
+    await env.tools.send_message(chat="me", text="и себе")
+    assert svc.client.send_message.await_count == 2
+
+
+async def test_forward_saved_only_and_forward_right(env):
+    acc, svc = await add(env)
+    env.cfg.set_permissions(acc, SAVED_ONLY)
+    _ents(svc, {"ivan": make_user(), "chan": make_user(uid=30, username="chan")})
+    svc.client.forward_messages = AsyncMock(return_value=[make_msg(mid=77)])
+    await env.tools.forward_messages(from_chat="@ivan", message_ids=[1, 2], to_chat="me")
+    svc.client.forward_messages.assert_awaited_once()
+    with pytest.raises(ToolError, match="только в Избранное"):
+        await env.tools.forward_messages(from_chat="@ivan", message_ids=[1], to_chat="@chan")
+    assert svc.client.forward_messages.await_count == 1
+    # с правом «Пересылка» — в любой чат
+    env.cfg.set_permissions(acc, {g: g in ("read", "forward") for g in GROUPS})
+    await env.tools.forward_messages(from_chat="@ivan", message_ids=[1], to_chat="@chan")
+    assert svc.client.forward_messages.await_count == 2
+    # без send_saved, send и forward — отказ даже в Избранное
+    env.cfg.set_permissions(acc, {g: g == "read" for g in GROUPS})
+    with pytest.raises(ToolError, match="Запрещено настройками прав"):
+        await env.tools.forward_messages(from_chat="@ivan", message_ids=[1], to_chat="me")
+
+
+async def test_permissions_report_send_saved(env):
+    acc, svc = await add(env)
+    env.cfg.set_permissions(acc, SAVED_ONLY)
+    got = json.loads(await env.tools.get_permissions())
+    assert got["groups"]["send_saved"] == "Отправка только в Избранное"
+    assert got["accounts"][0]["permissions"]["send_saved"] is True
+    accs = json.loads(await env.tools.list_accounts())
+    assert accs["accounts"][0]["permissions"]["send_saved"] is True
+
+
+def test_migration_adds_send_saved(tmp_path):
+    from app.config import Config
+    path = tmp_path / "config.json"
+    old = {"accounts": [
+        {"id": "a1b2c3d4", "label": "Личный", "proxy": "app",
+         "permissions": {"read": True, "download": True, "send": False, "forward": False, "edit": False,
+                         "delete": False, "react": False, "mark_read": False, "proxy": False}},
+        {"id": "b0b0b0b0", "label": "Новый формат", "proxy": "app",
+         "permissions": {**{g: False for g in GROUPS}, "read": True}},  # send_saved уже есть = False
+    ], "mcp_port": 18791, "mcp_token": "t"}
+    path.write_text(json.dumps(old), encoding="utf-8")
+    cfg = Config(path)
+    p1 = cfg.permissions("a1b2c3d4")
+    assert p1["send_saved"] is True and p1["read"] and p1["download"] and not p1["send"]
+    assert cfg.permissions("b0b0b0b0")["send_saved"] is False  # явное значение не трогаем
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert saved["accounts"][0]["permissions"]["send_saved"] is True  # записано в файл
+    # повторная загрузка ничего не меняет
+    assert Config(path).permissions("a1b2c3d4") == p1
 
 
 async def test_permissions_checked_on_server(env):

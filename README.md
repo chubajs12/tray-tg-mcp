@@ -23,7 +23,8 @@
 
 - Несколько аккаунтов Telegram, у каждого своя сессия, свои права MCP и свой прокси.
 - MCP-сервер на `127.0.0.1` (streamable HTTP, `/mcp`) с обязательным Bearer-токеном.
-- Права по группам операций для каждого аккаунта; по умолчанию — **только чтение**. Менять права можно только в
+- Права по группам операций для каждого аккаунта; у нового аккаунта по умолчанию — **чтение, скачивание вложений и
+  отправка только в «Избранное»**. Менять права можно только в
   окне приложения, через MCP — нельзя.
 - Клиент не показывает вас «в сети», не отправляет «печатает…», при чтении ничего не помечает прочитанным
   (только явный `mark_read`).
@@ -83,7 +84,8 @@ sha256sum -c TG-MCP.exe.sha256
 3. **Вход.** Раздел «Аккаунты» → метка (например «Личный») → «Продолжить» → отсканируйте QR-код в Telegram на
    телефоне: Настройки → Устройства → «Подключить устройство». Если включен облачный пароль — введите его в том
    же разделе (он нигде не сохраняется).
-4. **Права MCP** — по умолчанию «Только чтение»; расширьте ровно настолько, насколько нужно.
+4. **Права MCP** — по умолчанию: чтение, скачивание и отправка только в «Избранное» (агент может написать вам,
+   но не другим). Расширьте ровно настолько, насколько нужно.
 
 ## Подключение к Claude Code
 
@@ -112,8 +114,9 @@ claude mcp add --transport http tg http://127.0.0.1:8791/mcp --header "Authoriza
 | — (всегда) | `list_accounts`, `get_permissions`, `get_proxy` |
 | Чтение | `get_me`, `list_chats`, `get_messages`, `get_message`, `search_messages`, `list_topics`, `get_chat_info`, `get_participants`, `list_contacts`, `resolve` |
 | Скачивание вложений | `download_media` |
-| Отправка | `send_message`, `send_file` |
-| Пересылка | `forward_messages` |
+| Отправка только в «Избранное» | `send_message`, `send_file`, `forward_messages` — только если цель — собственное «Избранное» аккаунта (`me`, свой id или @username) |
+| Отправка | `send_message`, `send_file` (в любой чат, включая «Избранное») |
+| Пересылка | `forward_messages` в любой чат (в «Избранное» — достаточно права «Отправка только в Избранное») |
 | Редактирование своих сообщений | `edit_message` |
 | Удаление | `delete_messages` |
 | Реакции | `send_reaction` |
@@ -169,7 +172,7 @@ powershell -ExecutionPolicy Bypass -File build_exe.ps1   # сборка dist\TG 
 
 **TG MCP** is a background Telegram client for **your own account** with an MCP server, so Claude Code (or any MCP
 client) can read your chats and act on your behalf — strictly within per-account permissions you grant in the app
-(read-only by default; permissions cannot be changed over MCP). No chat UI: a Telegram-Desktop-styled settings
+(new accounts default to read + download + send-to-Saved-Messages-only; permissions cannot be changed over MCP). No chat UI: a Telegram-Desktop-styled settings
 window and a tray icon. Windows, single `.exe`. Unofficial client built on Telethon; not affiliated with Telegram.
 
 - **Install:** download [TG-MCP.exe](https://github.com/chubajs12/tray-tg-mcp/releases/latest/download/TG-MCP.exe)

@@ -8,6 +8,7 @@ from typing import Any
 GROUPS: dict[str, str] = {
     "read": "Чтение (чаты, история, поиск, инфо, участники, контакты, темы)",
     "download": "Скачивание вложений",
+    "send_saved": "Отправка только в Избранное",
     "send": "Отправка сообщений и файлов",
     "forward": "Пересылка",
     "edit": "Редактирование своих сообщений",
@@ -24,7 +25,18 @@ PRESETS: dict[str, dict[str, bool]] = {
 }
 PRESET_TITLES = {"read_only": "Только чтение", "read_write": "Чтение и запись", "all": "Всё"}
 
-DEFAULT_PRESET = "read_only"
+# пояснения под тумблерами в окне «Права MCP»
+GROUP_HINTS: dict[str, str] = {
+    "send_saved": "send_message, send_file и пересылка — только в собственное «Избранное» аккаунта. "
+                  "Общая «Отправка» включает и Избранное.",
+}
+
+# новый аккаунт: безопасный минимум — читать, скачивать и писать себе в «Избранное»
+DEFAULT_NEW_ACCOUNT = {g: g in ("read", "download", "send_saved") for g in GROUPS}
+
+# инструменты, которые при праве send_saved (или send) разрешены, если цель — «Избранное» аккаунта
+SAVED_TARGET_TOOLS = {"send_message", "send_file", "forward_messages"}
+SAVED_ONLY_DENIED = "Запрещено настройками прав: разрешена отправка только в Избранное"
 
 # инструмент → группа прав (None — доступен всегда: служебные сведения без содержимого чатов)
 TOOL_GROUP: dict[str, str | None] = {
@@ -55,7 +67,17 @@ TOOL_GROUP: dict[str, str | None] = {
 
 
 def default_permissions() -> dict[str, bool]:
-    return dict(PRESETS[DEFAULT_PRESET])
+    return dict(DEFAULT_NEW_ACCOUNT)
+
+
+def migrate(perms: Any) -> tuple[dict[str, bool], bool]:
+    """Права старого формата (без send_saved) → добавить send_saved=True. Возвращает (права, изменены ли)."""
+    raw = perms if isinstance(perms, dict) else {}
+    changed = False
+    if "send_saved" not in raw:
+        raw = {**raw, "send_saved": True}
+        changed = True
+    return normalize(raw), changed
 
 
 def normalize(perms: Any) -> dict[str, bool]:

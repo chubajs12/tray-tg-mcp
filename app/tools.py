@@ -31,7 +31,8 @@ from .config import Config, ConfigError, mask_proxy, normalize_proxy, proxy_titl
 from .formatting import (entity_type, format_dialog, format_message, format_user, iso,
                          short_entity)
 from .logs import ActionLog
-from .permissions import GROUPS, PRESET_TITLES, TOOL_GROUP, preset_of
+from .permissions import (GROUPS, PRESET_TITLES, SAVED_ONLY_DENIED, SAVED_TARGET_TOOLS, TOOL_GROUP,
+                          preset_of)
 from .telegram import NotReady, TelegramService
 
 log = logging.getLogger("tgmcp.tools")
@@ -63,6 +64,8 @@ def _read_summary(result: Any) -> Any:
 
 
 _current: contextvars.ContextVar[TelegramService | None] = contextvars.ContextVar("tgmcp_account", default=None)
+# True — вызов разрешен только с целью «Избранное» (право send_saved без общего права группы)
+_saved_only: contextvars.ContextVar[bool] = contextvars.ContextVar("tgmcp_saved_only", default=False)
 
 
 def denied_message(group: str, label: str) -> str:
@@ -88,13 +91,18 @@ def tool(kind: Literal["read", "write", "config"], account: Literal["required", 
             self.calls += 1
             svc: TelegramService | None = None
             token = None
+            token_saved = None
             try:
                 if account == "required" or (account == "optional" and acc_param):
                     svc = self.manager.resolve(acc_param)
                     acc_info = {"id": svc.account_id, "label": svc.label}
                     group = TOOL_GROUP.get(name)
-                    if account == "required" and group and not self.config.permissions(svc.account_id).get(group):
-                        raise ToolError(denied_message(group, svc.label))
+                    perms = self.config.permissions(svc.account_id)
+                    if account == "required" and group and not perms.get(group):
+                        if name in SAVED_TARGET_TOOLS and (perms.get("send_saved") or perms.get("send")):
+                            token_saved = _saved_only.set(True)  # цель проверит сам инструмент
+                        else:
+                            raise ToolError(denied_message(group, svc.label))
                 token = _current.set(svc)
                 if kind == "write" and svc is not None:
                     wait = svc.limiter.blocked_for()
@@ -126,6 +134,8 @@ def tool(kind: Literal["read", "write", "config"], account: Literal["required", 
             finally:
                 if token is not None:
                     _current.reset(token)
+                if token_saved is not None:
+                    _saved_only.reset(token_saved)
             self.actions.write(name, params, True, account=acc_info,
                                result=_read_summary(result) if kind == "read" else result)
             return _dumps(result)
@@ -181,6 +191,19 @@ class Tools:
     @property
     def client(self):
         return self.service.require()
+
+    async def _is_saved(self, entity: Any) -> bool:
+        """Цель — собственное «Избранное» аккаунта (сравнение по id после резолва, не по строке)."""
+        if not isinstance(entity, types.User):
+            return False
+        if getattr(entity, "is_self", False):
+            return True
+        me = await self.client.get_me()
+        return utils.get_peer_id(entity) == utils.get_peer_id(me)
+
+    async def _require_saved_if_limited(self, entity: Any) -> None:
+        if _saved_only.get() and not await self._is_saved(entity):
+            raise ToolError(SAVED_ONLY_DENIED + f" (аккаунт «{self.service.label}»).")
 
     async def _all_dialogs(self, force: bool = False) -> list[Any]:
         svc = self.service
@@ -605,6 +628,7 @@ class Tools:
         if len(text) > MAX_TEXT:
             raise ToolError(f"Текст длиннее {MAX_TEXT} символов ({len(text)}); разбейте на части.")
         e = await self._entity(chat)
+        await self._require_saved_if_limited(e)
         m = await self.client.send_message(e, text, reply_to=reply_to or topic or None,
                                            parse_mode=self._parse_mode(parse_mode), silent=silent or None,
                                            link_preview=link_preview)
@@ -629,6 +653,7 @@ class Tools:
         if caption and len(caption) > MAX_CAPTION:
             raise ToolError(f"Подпись длиннее {MAX_CAPTION} символов.")
         e = await self._entity(chat)
+        await self._require_saved_if_limited(e)
         m = await self.client.send_file(e, str(p), caption=caption or None, reply_to=reply_to or topic or None,
                                         force_document=force_document, parse_mode=self._parse_mode(parse_mode))
         return {"chat": short_entity(e), "message_id": m.id, "date": iso(m.date), "file": p.name}
@@ -650,6 +675,7 @@ class Tools:
             raise ToolError("Не указаны message_ids.")
         src = await self._entity(from_chat)
         dst = await self._entity(to_chat)
+        await self._require_saved_if_limited(dst)  # без права «Пересылка» — только в Избранное
         c = self.client
         if topic:
             await c(functions.messages.ForwardMessagesRequest(

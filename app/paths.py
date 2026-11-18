@@ -24,6 +24,16 @@ def _default_data_dir() -> Path:
 
 
 DATA_DIR = Path(os.environ.get("TGMCP_DATA_DIR") or _default_data_dir())
+# Каталог данных переопределен (--data-dir / TGMCP_DATA_DIR): отдельный экземпляр со своими именами mutex/событий
+# и своей записью api_id/api_hash в хранилище — не пересекается с основным запущенным приложением.
+DATA_DIR_OVERRIDDEN = bool(os.environ.get("TGMCP_DATA_DIR"))
+
+
+def instance_suffix() -> str:
+    if not DATA_DIR_OVERRIDDEN:
+        return ""
+    import hashlib  # noqa: PLC0415
+    return "-" + hashlib.sha1(str(DATA_DIR.resolve()).lower().encode("utf-8")).hexdigest()[:10]
 
 CONFIG_FILE = DATA_DIR / "config.json"
 ACCOUNTS_DIR = DATA_DIR / "accounts"  # data/accounts/<id>/meta.json (+ session.dpapi, если нет keyring)

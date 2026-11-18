@@ -168,6 +168,7 @@ def diagnostics() -> dict:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="tg-mcp")
     ap.add_argument("--show", action="store_true", help="сразу открыть окно")
+    ap.add_argument("--data-dir", help="отдельный каталог данных (обрабатывается в run.pyw до импорта)")
     ap.add_argument("--selftest", type=Path, help="снимки окна (Qt grab) в каталог, затем выход")
     ap.add_argument("--selftest-hold", type=float, default=2.0, help="пауза перед выходом в --selftest, с")
     ap.add_argument("--quit", action="store_true", help="попросить запущенный экземпляр корректно завершиться")

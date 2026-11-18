@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QButtonGroup, QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                               QRadioButton, QVBoxLayout, QWidget)
+                               QRadioButton, QSizePolicy, QVBoxLayout, QWidget)
 
 from ..config import ConfigError, check_mtproto_secret, normalize_proxy, parse_proxy_link
 from .widgets import label
@@ -17,7 +17,7 @@ class ProxyDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Редактирование прокси")
         self.setModal(True)
-        self.setMinimumWidth(440)
+        self.setMinimumWidth(480)
         self.result_proxy: dict | None = None
         self._id = (proxy or {}).get("id")
         v = QVBoxLayout(self)
@@ -69,7 +69,10 @@ class ProxyDialog(QDialog):
         self.note = label("", "muted", wrap=True)
         v.addWidget(self.note)
         self.error = label("", "err", wrap=True)
+        self.error.setVisible(False)
         v.addWidget(self.error)
+        for w in (self.note, self.error):  # перенос по словам, высота — по содержимому
+            w.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
 
         btns = QHBoxLayout()
         btns.addStretch(1)
@@ -108,7 +111,7 @@ class ProxyDialog(QDialog):
                           "не умеет TLS-маскировку." if mt else "")
         self.note.setVisible(mt)
         self._validate_secret()
-        self.adjustSize()
+        self._fit()
 
     def _maybe_link(self, text: str):
         p = parse_proxy_link(text)
@@ -123,6 +126,31 @@ class ProxyDialog(QDialog):
         self.user.setText(p.get("username", ""))
         self.password.setText(p.get("password", ""))
 
+    def _show_error(self, text: str) -> None:
+        self.error.setText(text)
+        self.error.setVisible(bool(text))
+        self._fit()
+
+    def _fit(self) -> None:
+        """Подогнать высоту диалога под текст подсказок при текущей ширине (длинные сообщения не обрезаются)."""
+        lay = self.layout()
+        lay.invalidate()
+        lay.activate()
+        w = max(self.width(), self.minimumWidth())
+        h = lay.heightForWidth(w) if lay.hasHeightForWidth() else lay.sizeHint().height()
+        h = max(h, lay.minimumSize().height())
+        self.setMinimumHeight(h)
+        if self.height() != h:
+            self.resize(w, h)
+
+    def resizeEvent(self, e):  # noqa: N802 — при изменении ширины пересчитать высоту переносов
+        super().resizeEvent(e)
+        lay = self.layout()
+        if lay is not None and lay.hasHeightForWidth():
+            need = lay.heightForWidth(self.width())
+            if need > 0 and need != self.minimumHeight():
+                self.setMinimumHeight(need)
+
     def _set_err(self, w: QWidget, on: bool):
         w.setProperty("error", "true" if on else "false")
         w.style().unpolish(w)
@@ -131,16 +159,16 @@ class ProxyDialog(QDialog):
     def _validate_secret(self, *_):
         if self.ptype() != "mtproto" or not self.secret.text().strip():
             self._set_err(self.secret, False)
-            self.error.setText("")
+            self._show_error("")
             return True
         try:
             check_mtproto_secret(self.secret.text())
             self._set_err(self.secret, False)
-            self.error.setText("")
+            self._show_error("")
             return True
         except ConfigError as e:
             self._set_err(self.secret, True)
-            self.error.setText(str(e))
+            self._show_error(str(e))
             return False
 
     def _accept(self):
@@ -149,6 +177,6 @@ class ProxyDialog(QDialog):
                 "id": self._id, "type": self.ptype(), "server": self.host.text(), "port": self.port.text(),
                 "username": self.user.text(), "password": self.password.text(), "secret": self.secret.text()})
         except ConfigError as e:
-            self.error.setText(str(e)[:1].upper() + str(e)[1:])
+            self._show_error(str(e)[:1].upper() + str(e)[1:])
             return
         self.accept()

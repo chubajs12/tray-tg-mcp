@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import APP_TITLE, paths
 
-MUTEX_NAME = "Local\\tg-mcp-single-instance"
+MUTEX_NAME = "Local\\tg-mcp-single-instance" + paths.instance_suffix()
 ERROR_ALREADY_EXISTS = 183
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_VALUE = "tg-mcp"
@@ -80,7 +80,7 @@ def set_autostart(enabled: bool) -> None:
 
 
 # ---------- корректное завершение извне (run.pyw --quit, uninstall.ps1) ----------
-QUIT_EVENT = "Local\\tg-mcp-quit"
+QUIT_EVENT = "Local\\tg-mcp-quit" + paths.instance_suffix()
 _kernel32.CreateEventW.argtypes = [wintypes.LPVOID, wintypes.BOOL, wintypes.BOOL, wintypes.LPCWSTR]
 _kernel32.CreateEventW.restype = wintypes.HANDLE
 _kernel32.OpenEventW.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]
@@ -90,7 +90,7 @@ _kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
 _kernel32.WaitForSingleObject.restype = wintypes.DWORD
 
 
-SHOW_EVENT = "Local" + chr(92) + "tg-mcp-show"
+SHOW_EVENT = "Local" + chr(92) + "tg-mcp-show" + paths.instance_suffix()
 _kernel32.ResetEvent.argtypes = [wintypes.HANDLE]
 
 

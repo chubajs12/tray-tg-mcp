@@ -7,6 +7,12 @@ from pathlib import Path
 if not getattr(sys, "frozen", False):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+# --data-dir <путь>: отдельный каталог данных (проверки, второй независимый экземпляр); до импорта app.paths
+if "--data-dir" in sys.argv:
+    _i = sys.argv.index("--data-dir")
+    if _i + 1 < len(sys.argv):
+        os.environ["TGMCP_DATA_DIR"] = sys.argv[_i + 1]
+
 from app import paths  # noqa: E402 — легкий модуль, без тяжелых импортов
 
 # pythonw / exe без консоли: stdout/stderr отсутствуют — пишем их в файл, а не роняем процесс
