@@ -1,0 +1,24 @@
+# app data: sessions, config.json with the MCP token, logs, downloads
+data/
+.env
+*.session
+*.session-journal
+
+# python / build
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+build/
+dist/
+*.spec
+release/
+
+# local scratch
+*.log
+temp/
+
+# internal (not part of the public repository)
+CLAUDE.md
+internal/

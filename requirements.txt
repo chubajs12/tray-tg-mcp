@@ -1,0 +1,11 @@
+# TG MCP — зависимости (Python 3.13, venv проекта .venv)
+Telethon==1.45.0
+cryptg==0.6.1
+python-socks[asyncio]==3.2.1
+mcp==1.30.0            # 1.x: FastMCP + streamable HTTP (в 2.x FastMCP переименован в MCPServer)
+uvicorn==0.54.0
+PySide6-Essentials==6.12.0  # окно и трей (Qt)
+Pillow==13.0.0
+qrcode==8.2
+keyring==25.7.0        # сессии в Диспетчере учетных данных Windows
+pywin32==312           # DPAPI (запасное хранилище сессий)
