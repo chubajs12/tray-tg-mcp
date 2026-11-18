@@ -1,8 +1,8 @@
 # Version info для PyInstaller (--version-file). Версию держать в согласии с app/__init__.py (APP_VERSION).
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(1, 0, 1, 0),
+    prodvers=(1, 0, 1, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -16,12 +16,12 @@ VSVersionInfo(
         '041904B0',
         [StringStruct('CompanyName', 'TG MCP'),
          StringStruct('FileDescription', 'TG MCP - MCP server for your Telegram account'),
-         StringStruct('FileVersion', '1.0.0'),
+         StringStruct('FileVersion', '1.0.1'),
          StringStruct('InternalName', 'TG MCP'),
          StringStruct('LegalCopyright', ''),
          StringStruct('OriginalFilename', 'TG MCP.exe'),
          StringStruct('ProductName', 'TG MCP'),
-         StringStruct('ProductVersion', '1.0.0')])
+         StringStruct('ProductVersion', '1.0.1')])
     ]),
     VarFileInfo([VarStruct('Translation', [0x0419, 1200])])
   ]

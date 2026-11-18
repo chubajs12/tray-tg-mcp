@@ -2,5 +2,5 @@
 
 APP_NAME = "tg-mcp"
 APP_TITLE = "TG MCP"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 DEVICE_MODEL = "TG MCP Desktop"

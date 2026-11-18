@@ -35,12 +35,32 @@
 
 ## Установка
 
-1. Скачайте `TG MCP.exe` со страницы [Releases](https://github.com/chubajs12/tray-tg-mcp/releases/latest) (рядом — `TG MCP.exe.sha256` для проверки:
-   `Get-FileHash "TG MCP.exe"` в PowerShell).
+1. Скачайте [TG-MCP.exe](https://github.com/chubajs12/tray-tg-mcp/releases/latest/download/TG-MCP.exe)
+   (последняя версия; все версии — на странице [Releases](https://github.com/chubajs12/tray-tg-mcp/releases)) и
+   при желании [TG-MCP.exe.sha256](https://github.com/chubajs12/tray-tg-mcp/releases/latest/download/TG-MCP.exe.sha256)
+   для проверки целостности (см. «Проверка хеша» ниже).
 2. Положите exe в любую папку и запустите. Установщика нет; данные хранятся в `%APPDATA%\TG MCP\`.
 3. exe не подписан цифровой подписью, поэтому Windows SmartScreen при первом запуске покажет «Windows защитила
    ваш компьютер» → «Подробнее» → «Выполнить в любом случае». Некоторые антивирусы настороженно относятся к
    exe, собранным PyInstaller; если сомневаетесь — соберите сами из исходников (ниже).
+
+### Проверка хеша
+
+Положите `TG-MCP.exe` и `TG-MCP.exe.sha256` в одну папку и выполните там одну из команд.
+
+PowerShell:
+
+```powershell
+$expected = (Get-Content .\TG-MCP.exe.sha256).Split(' ')[0]
+$actual = (Get-FileHash .\TG-MCP.exe -Algorithm SHA256).Hash.ToLower()
+if ($actual -eq $expected) { 'OK' } else { 'MISMATCH' }
+```
+
+Git Bash / WSL / Linux:
+
+```bash
+sha256sum -c TG-MCP.exe.sha256
+```
 
 Удаление: правый клик по иконке в трее → «Выход», удалите exe и при желании папку `%APPDATA%\TG MCP`. Перед этим
 нажмите «Выйти» у аккаунтов (раздел «Аккаунты») — это завершит сеанс на сервере Telegram и удалит ключ сессии из
@@ -152,7 +172,10 @@ client) can read your chats and act on your behalf — strictly within per-accou
 (read-only by default; permissions cannot be changed over MCP). No chat UI: a Telegram-Desktop-styled settings
 window and a tray icon. Windows, single `.exe`. Unofficial client built on Telethon; not affiliated with Telegram.
 
-- **Install:** download `TG MCP.exe` from [Releases](https://github.com/chubajs12/tray-tg-mcp/releases/latest) and run it (unsigned — SmartScreen: *More info → Run anyway*).
+- **Install:** download [TG-MCP.exe](https://github.com/chubajs12/tray-tg-mcp/releases/latest/download/TG-MCP.exe)
+  (all versions: [Releases](https://github.com/chubajs12/tray-tg-mcp/releases)) and run it (unsigned — SmartScreen:
+  *More info → Run anyway*). Verify: `sha256sum -c TG-MCP.exe.sha256`, or compare
+  `(Get-FileHash .\TG-MCP.exe).Hash` with the first field of `TG-MCP.exe.sha256` in PowerShell.
   Data lives in `%APPDATA%\TG MCP\`; session keys and `api_id`/`api_hash` are stored in Windows Credential Manager.
 - **First run:** create your own `api_id`/`api_hash` at [my.telegram.org](https://my.telegram.org) (API development
   tools → Create application, Platform: Desktop) and paste them in *Settings*; add a proxy if needed (SOCKS5/HTTP/
